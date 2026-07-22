@@ -1,12 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("renders the application foundation", async ({ page }) => {
+test("renders the accessible location loading state", async ({ page }) => {
   await page.goto("/");
 
-  await expect(
-    page.getByRole("heading", { level: 1, name: /multi-location menu/i }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "Foundation status" }),
-  ).toBeVisible();
+  await expect(page.locator("main")).toBeVisible();
+  await expect(page.getByText("Loading the location menu.")).toBeVisible();
 });

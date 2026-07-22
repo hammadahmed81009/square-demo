@@ -13,7 +13,7 @@ import {
   type WeeklyIntervalDto,
   PUBLIC_SCHEMA_VERSION,
 } from "@/shared/contracts";
-import { resolveInventoryState } from "@/features/menu";
+import { resolveInventoryState } from "@/features/menu/availability";
 
 type RawRecord = Record<string, unknown>;
 

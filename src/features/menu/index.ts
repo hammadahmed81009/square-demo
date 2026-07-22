@@ -15,3 +15,4 @@ export {
   type VariationOrderability,
   type WeeklySchedulePeriod,
 } from "@/features/menu/availability";
+export { LocationRedirect, MenuBrowser } from "@/features/menu/menu-browser";

@@ -1,20 +1,18 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
 describe("Home", () => {
-  it("identifies the application and its foundation status", () => {
+  it("starts with an accessible location-loading state", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
     render(<Home />);
 
-    expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: /multi-location menu/i,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Foundation status" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Loading the location menu.")).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });
