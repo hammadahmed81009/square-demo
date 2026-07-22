@@ -13,6 +13,7 @@ import {
   type WeeklyIntervalDto,
   PUBLIC_SCHEMA_VERSION,
 } from "@/shared/contracts";
+import { resolveInventoryState } from "@/features/menu";
 
 type RawRecord = Record<string, unknown>;
 
@@ -568,16 +569,6 @@ function validDate(value: unknown): string | null {
   return parsed.success ? parsed.data : null;
 }
 
-function nonPositiveQuantity(value: string): boolean | null {
-  if (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
-    return null;
-  }
-  if (value.startsWith("-")) {
-    return true;
-  }
-  return /^0(?:\.0+)?$/.test(value);
-}
-
 function inventoryByVariation(
   inventory: readonly unknown[],
   locationId: string,
@@ -654,38 +645,36 @@ function normalizeVariations(
     } else {
       addWarning("UNSUPPORTED_PRICING", "An unsupported variation pricing model remains browse-only.");
     }
-    const effectiveTrack = booleanField(override ?? {}, "track_inventory", "trackInventory") ??
-      booleanField(data, "track_inventory", "trackInventory") ?? false;
-    const soldOut = booleanField(override ?? {}, "sold_out", "soldOut") === true;
-    const soldOutUntil = validDate(field(override ?? {}, "sold_out_valid_until", "soldOutValidUntil"));
-    const soldOutStillValid = soldOut && (soldOutUntil === null || Date.parse(soldOutUntil) > now.getTime());
     const observation = inventory.get(id);
-    const countIsNonPositive = observation === undefined
-      ? null
-      : nonPositiveQuantity(observation.quantity);
-    if (observation !== undefined && countIsNonPositive === null) {
+    if (
+      observation !== undefined &&
+      !/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(observation.quantity)
+    ) {
       addWarning("INVALID_INVENTORY_QUANTITY", "A malformed inventory quantity was treated as unknown.");
     }
-    const inventoryState = soldOutStillValid
-      ? "sold_out"
-      : !effectiveTrack
-        ? "untracked"
-        : !hasInventory || observation === undefined || countIsNonPositive === null
-          ? "unknown"
-          : countIsNonPositive
-            ? "sold_out"
-            : "in_stock";
+    const inventoryResolution = resolveInventoryState({
+      calculatedAt: observation?.calculatedAt,
+      globalTrackInventory: booleanField(data, "track_inventory", "trackInventory"),
+      inventoryAvailable: hasInventory,
+      locationSoldOut: booleanField(override ?? {}, "sold_out", "soldOut"),
+      locationTrackInventory: booleanField(override ?? {}, "track_inventory", "trackInventory"),
+      now,
+      quantity: observation?.quantity,
+      soldOutValidUntil: validDate(
+        field(override ?? {}, "sold_out_valid_until", "soldOutValidUntil"),
+      ),
+    });
     variations.push({
       id,
       imageUrl: imageUrl(arrayField(data, "image_ids", "imageIds"), images, addWarning) ?? itemImage,
-      inventoryState,
-      inventoryUpdatedAt: observation?.calculatedAt ?? null,
+      inventoryState: inventoryResolution.inventoryState,
+      inventoryUpdatedAt: inventoryResolution.inventoryUpdatedAt,
       name: stringField(data, "name") ?? "Default",
       ordinal: integerField(data, "ordinal") ?? 0,
       price,
       pricingStatus,
       sellable: booleanField(data, "sellable") !== false,
-      soldOutUntil,
+      soldOutUntil: inventoryResolution.soldOutUntil,
     });
   }
   return sortByOrdinalNameAndId(variations);
