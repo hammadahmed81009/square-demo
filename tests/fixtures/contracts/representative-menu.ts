@@ -1,0 +1,120 @@
+import type { MenuSnapshotDto } from "@/shared/contracts";
+
+export const representativeMenuSnapshot: MenuSnapshotDto = {
+  schemaVersion: 1,
+  location: {
+    id: "LOC_DOWNTOWN",
+    name: "Downtown",
+    addressLines: ["100 Main Street", "New York, NY 10001"],
+    timezone: "America/New_York",
+    timezoneStatus: "valid",
+    locale: "en-US",
+    currency: "USD",
+    businessHours: [
+      { startMinute: 420, endMinute: 1_080 },
+      { startMinute: 1_860, endMinute: 2_520 },
+    ],
+  },
+  categories: [
+    {
+      id: "CAT_COFFEE",
+      name: "Coffee",
+      ordinal: 1,
+      parentId: "CAT_BREAKFAST",
+      kind: "menu",
+      scheduleWindows: [
+        { startMinute: 420, endMinute: 660 },
+        { startMinute: 1_860, endMinute: 2_100 },
+      ],
+    },
+    {
+      id: "CAT_BREAKFAST",
+      name: "Breakfast",
+      ordinal: 2,
+      parentId: null,
+      kind: "menu",
+      scheduleWindows: [
+        { startMinute: 420, endMinute: 660 },
+        { startMinute: 1_860, endMinute: 2_100 },
+      ],
+    },
+  ],
+  items: [
+    {
+      id: "ITEM_LATTE",
+      name: "House Latte",
+      description: "Espresso with steamed milk.",
+      imageUrl: "https://images.squareup.com/example/latte.jpg",
+      categoryIds: ["CAT_COFFEE"],
+      ordinal: 1,
+      scheduleWindows: [
+        { startMinute: 420, endMinute: 660 },
+        { startMinute: 1_860, endMinute: 2_100 },
+      ],
+      variations: [
+        {
+          id: "VAR_LATTE_SMALL",
+          name: "Small",
+          ordinal: 1,
+          sellable: true,
+          pricingStatus: "fixed",
+          price: { amountMinor: "450", currency: "USD" },
+          imageUrl: null,
+          inventoryState: "in_stock",
+          inventoryUpdatedAt: "2026-07-23T08:00:00.000Z",
+          soldOutUntil: null,
+        },
+        {
+          id: "VAR_LATTE_LARGE",
+          name: "Large",
+          ordinal: 2,
+          sellable: true,
+          pricingStatus: "fixed",
+          price: { amountMinor: "550", currency: "USD" },
+          imageUrl: null,
+          inventoryState: "sold_out",
+          inventoryUpdatedAt: "2026-07-23T08:00:00.000Z",
+          soldOutUntil: null,
+        },
+      ],
+      modifierGroups: [
+        {
+          id: "MOD_MILK",
+          type: "list",
+          name: "Milk",
+          ordinal: 1,
+          minimumSelections: 1,
+          maximumSelections: 1,
+          allowQuantities: false,
+          options: [
+            {
+              id: "MOD_WHOLE",
+              name: "Whole milk",
+              ordinal: 1,
+              price: { amountMinor: "0", currency: "USD" },
+              defaultSelected: true,
+            },
+            {
+              id: "MOD_OAT",
+              name: "Oat milk",
+              ordinal: 2,
+              price: { amountMinor: "100", currency: "USD" },
+              defaultSelected: false,
+            },
+          ],
+        },
+        {
+          id: "MOD_CUP_NAME",
+          type: "text",
+          name: "Name on cup",
+          ordinal: 2,
+          required: false,
+          maximumCodePoints: 24,
+        },
+      ],
+    },
+  ],
+  inventoryStatus: "fresh",
+  generatedAt: "2026-07-23T08:00:01.000Z",
+  catalogUpdatedAt: "2026-07-20T10:10:00.000Z",
+};
