@@ -112,6 +112,7 @@ export const representativeMenuSnapshot: MenuSnapshotDto = {
           maximumCodePoints: 24,
         },
       ],
+      modifierConfigurationError: null,
     },
   ],
   inventoryStatus: "fresh",

@@ -181,6 +181,7 @@ export const menuItemSchema = z
     scheduleWindows: z.array(weeklyIntervalSchema).nullable(),
     variations: z.array(menuVariationSchema).min(1),
     modifierGroups: z.array(modifierGroupSchema),
+    modifierConfigurationError: z.string().trim().min(1).max(500).nullable(),
   })
   .strict();
 
