@@ -5,6 +5,15 @@ import {
   PUBLIC_SCHEMA_VERSION,
   warningSchema,
 } from "./common";
+import { locationSchema } from "./menu";
+
+export const locationsDataSchema = z
+  .object({
+    locations: z.array(locationSchema),
+  })
+  .strict();
+
+export type LocationsDataDto = z.infer<typeof locationsDataSchema>;
 
 export const apiSourceSchema = z.enum([
   "upstream",

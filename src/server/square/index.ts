@@ -7,5 +7,6 @@ export {
   MAX_INVENTORY_VARIATION_IDS,
   SQUARE_CATALOG_OBJECT_TYPES,
   type SquareGatewayRead,
+  type SquareGatewayReadSource,
   type SquareTransport,
 } from "@/server/square/types";

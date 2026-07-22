@@ -242,7 +242,8 @@ function presenceAtLocation(record: RawRecord, locationId: string): boolean {
   return !absentIds.includes(locationId);
 }
 
-function parseLocation(raw: unknown): MenuSnapshotDto["location"] {
+/** Normalize one active Square location into the public DTO shape. */
+export function normalizeLocation(raw: unknown): MenuSnapshotDto["location"] {
   const record = asRecord(raw);
   if (record === null) {
     throw new MenuNormalizationError("The selected location is malformed.");
@@ -961,7 +962,7 @@ function catalogUpdatedAt(index: ReadonlyMap<string, RawRecord>): string | null 
  */
 export function normalizeMenu(input: MenuNormalizationInput): MenuNormalizationResult {
   const warnings = warningCollector();
-  const location = parseLocation(input.location);
+  const location = normalizeLocation(input.location);
   const now = input.generatedAt ?? new Date();
   if (Number.isNaN(now.getTime())) {
     throw new MenuNormalizationError("The menu generation timestamp is invalid.");
