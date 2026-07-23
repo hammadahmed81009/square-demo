@@ -1,11 +1,18 @@
 export default function LocationLoading() {
   return (
-    <main aria-busy="true" className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-10">
-      <div className="h-8 w-56 animate-pulse rounded bg-slate-200" />
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="h-80 animate-pulse rounded-3xl bg-slate-100" />
-        <div className="h-80 animate-pulse rounded-3xl bg-slate-100" />
-        <div className="h-80 animate-pulse rounded-3xl bg-slate-100" />
+    <main aria-busy="true" className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8">
+      <div className="h-10 w-48 skeleton rounded-lg" />
+      <div className="mt-3 h-4 w-32 skeleton rounded" />
+      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {["one", "two", "three"].map((key) => (
+          <div className="overflow-hidden rounded-[1.25rem] border border-line/70 bg-surface" key={key}>
+            <div className="aspect-[4/3] skeleton" />
+            <div className="space-y-3 p-4">
+              <div className="h-5 w-2/3 skeleton rounded" />
+              <div className="h-4 w-full skeleton rounded" />
+            </div>
+          </div>
+        ))}
       </div>
       <p className="sr-only">Loading the location menu.</p>
     </main>
