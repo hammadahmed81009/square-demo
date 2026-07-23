@@ -19,6 +19,8 @@ import {
   nextMinuteBoundary,
   type ItemOrderability,
 } from "@/features/menu/availability";
+import { CartPanel, ItemConfigurator } from "@/features/cart/cart-ui";
+import { useLocationCart } from "@/features/cart/cart-store";
 
 import {
   filterMenuItems,
@@ -181,18 +183,19 @@ function ErrorState({ error, onRetry }: { readonly error: ApiClientError; readon
 function LocationSelector({
   activeId,
   locations,
+  onLocationChange,
 }: {
   readonly activeId: string;
   readonly locations: readonly LocationDto[];
+  readonly onLocationChange: (locationId: string) => void;
 }) {
-  const router = useRouter();
   return (
     <label className="block text-sm font-semibold text-slate-800">
       Location
       <select
         aria-label="Choose location"
         className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base shadow-sm"
-        onChange={(event) => router.push(`/locations/${event.target.value}`)}
+        onChange={(event) => onLocationChange(event.target.value)}
         value={activeId}
       >
         {locations.map((location) => (
@@ -250,11 +253,15 @@ function ItemCard({
 
 function DetailView({
   availability,
+  canMutate,
+  cart,
   item,
   locale,
   locationId,
 }: {
   readonly availability: ItemOrderability | undefined;
+  readonly canMutate: boolean;
+  readonly cart: ReturnType<typeof useLocationCart>;
   readonly item: MenuItemDto;
   readonly locale: string;
   readonly locationId: string;
@@ -310,6 +317,8 @@ function DetailView({
           </ul>
         </section>
       ) : null}
+      <ItemConfigurator availability={availability} canMutate={canMutate} currency={cart.cart.currency} item={item} locale={locale} onAdd={cart.add} />
+      <CartPanel canMutate={canMutate} controls={cart} locale={locale} notices={cart.notices} />
     </main>
   );
 }
@@ -342,18 +351,25 @@ function MenuContent({
 }) {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [pendingLocationId, setPendingLocationId] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const router = useRouter();
   const online = typeof navigator === "undefined" ? true : navigator.onLine;
-  const availability = evaluateMenuOrderability({
-    isOnline: online,
-    isSnapshotFresh: menu.meta.source !== "server-stale",
-    now,
-    snapshot: menu.data,
-  }).items;
+  const availability = useMemo(
+    () => evaluateMenuOrderability({
+      isOnline: online,
+      isSnapshotFresh: menu.meta.source !== "server-stale",
+      now,
+      snapshot: menu.data,
+    }).items,
+    [menu.data, menu.meta.source, now, online],
+  );
   const filteredItems = useMemo(
     () => filterMenuItems(menu.data, categoryId, search),
     [categoryId, menu.data, search],
   );
+  const cart = useLocationCart(locationId, menu.data.location.currency, menu.data, availability);
+  const canMutate = online && menu.meta.source !== "server-stale" && cart.hydrated;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -363,7 +379,26 @@ function MenuContent({
     const item = menu.data.items.find((candidate) => candidate.id === itemId);
     return item === undefined
       ? <NotFoundState itemId={itemId} locationId={locationId} />
-      : <DetailView availability={itemAvailability(availability, item.id)} item={item} locale={menu.data.location.locale} locationId={locationId} />;
+      : <DetailView availability={itemAvailability(availability, item.id)} canMutate={canMutate} cart={cart} item={item} locale={menu.data.location.locale} locationId={locationId} />;
+  }
+
+  function requestLocationChange(nextLocationId: string) {
+    if (nextLocationId === locationId) {
+      return;
+    }
+    if (cart.cart.lines.length > 0) {
+      setPendingLocationId(nextLocationId);
+      return;
+    }
+    router.push(`/locations/${nextLocationId}`);
+  }
+
+  function confirmLocationChange() {
+    if (pendingLocationId === null) {
+      return;
+    }
+    cart.clear();
+    router.push(`/locations/${pendingLocationId}`);
   }
 
   const grouped = search.trim().length > 0 || categoryId !== null
@@ -386,6 +421,7 @@ function MenuContent({
       })();
 
   return (
+    <>
     <main className="mx-auto w-full max-w-6xl px-6 py-8 sm:px-10">
       <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -393,7 +429,7 @@ function MenuContent({
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950" ref={headingRef} tabIndex={-1}>{menu.data.location.name}</h1>
           <p className="mt-2 text-sm text-slate-600">{sourceAgeLabel(menu.meta, now)}</p>
         </div>
-        <div className="w-full sm:w-64"><LocationSelector activeId={locationId} locations={locations} /></div>
+        <div className="w-full sm:w-64"><LocationSelector activeId={locationId} locations={locations} onLocationChange={requestLocationChange} /></div>
       </header>
       {menu.meta.source === "server-stale" ? <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">This is a server-stale menu snapshot. Browsing is available, but ordering controls are disabled until it refreshes.</p> : null}
       {menu.meta.warnings.length > 0 ? <section className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4" aria-label="Menu notices"><p className="font-semibold text-sky-950">Menu notices</p><ul className="mt-2 list-disc pl-5 text-sm text-sky-900">{menu.meta.warnings.map((warning) => <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>)}</ul></section> : null}
@@ -412,9 +448,12 @@ function MenuContent({
           <div className="grid gap-10">
             {grouped.map((group) => <section key={group.id}><h2 className="text-xl font-bold text-slate-950">{group.name}</h2><div className="mt-4 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{group.items.map((item) => <ItemCard availability={itemAvailability(availability, item.id)} item={item} key={`${group.id}:${item.id}`} locale={menu.data.location.locale} locationId={locationId} />)}</div></section>)}
           </div>
+          <CartPanel canMutate={canMutate} controls={cart} locale={menu.data.location.locale} notices={cart.notices} />
         </section>
       </div>
     </main>
+    {pendingLocationId === null ? null : <div aria-labelledby="location-change-title" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-6" role="dialog"><section className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl"><h2 className="text-xl font-bold text-slate-950" id="location-change-title">Clear cart and change location?</h2><p className="mt-3 text-slate-700">Menu selections and prices can differ by location. Your current cart will be cleared.</p><div className="mt-6 flex flex-wrap justify-end gap-3"><button className="rounded-xl border border-slate-300 px-4 py-2 font-semibold text-slate-900" onClick={() => setPendingLocationId(null)} type="button">Cancel</button><button className="rounded-xl bg-rose-700 px-4 py-2 font-semibold text-white" onClick={confirmLocationChange} type="button">Clear cart and change</button></div></section></div>}
+    </>
   );
 }
 

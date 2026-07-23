@@ -20,7 +20,8 @@ export const textModifierSelectionSchema = z
     type: z.literal("text"),
     groupId: identifierSchema,
     name: z.string().trim().min(1).max(255),
-    value: z.string().min(1).max(10_000),
+    // The product limit is in Unicode code points; astral code points use two UTF-16 units.
+    value: z.string().min(1).max(20_000),
   })
   .strict();
 
@@ -45,7 +46,7 @@ export const cartLineAvailabilitySchema = z.discriminatedUnion("status", [
 
 export const cartLineSchema = z
   .object({
-    key: z.string().trim().min(1).max(2048),
+    key: z.string().trim().min(1).max(262_144),
     itemId: identifierSchema,
     variationId: identifierSchema,
     itemName: z.string().trim().min(1).max(512),
