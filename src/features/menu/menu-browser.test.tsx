@@ -96,6 +96,30 @@ describe("MenuBrowser", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows a loading skeleton until the first response arrives", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+
+    render(<MenuBrowser locationId="LOC_DOWNTOWN" />);
+    expect(await screen.findByText("Loading the location menu.")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("renders the empty-menu state when a location has no visible items", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: string | URL) => {
+      const endpoint = String(input);
+      if (endpoint.startsWith("/api/locations")) {
+        return Promise.resolve(response(success({ locations: [representativeMenuSnapshot.location] })));
+      }
+      return Promise.resolve(response(success({
+        ...representativeMenuSnapshot,
+        items: [],
+      })));
+    }));
+
+    render(<MenuBrowser locationId="LOC_DOWNTOWN" />);
+    expect(await screen.findByText("This location has no visible menu items yet.")).toBeInTheDocument();
+  });
+
   it("combines normalized search and category filtering", async () => {
     const user = userEvent.setup();
     render(<MenuBrowser locationId="LOC_DOWNTOWN" />);

@@ -62,8 +62,10 @@ Seed data should include two active locations, 3–4 categories, 6–10 items, a
 
 - Unit tests target deterministic domain behavior and synchronous UI.
 - Integration tests target module boundaries, schemas, adapters, pagination, cache behavior, and Route Handlers.
-- Playwright covers guest-critical flows in a real browser.
+- Playwright covers guest-critical flows in a real browser, including accessibility smoke checks.
 - CI also performs production dependency auditing and secret scanning.
+
+Acceptance evidence for the local verification suite is recorded in [docs/verification-evidence.md](./docs/verification-evidence.md).
 
 ## Roadmap
 
