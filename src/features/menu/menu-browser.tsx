@@ -3,17 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  createApiResponseSchema,
-  locationsDataSchema,
-  menuSnapshotSchema,
-  type ApiSuccessDto,
-  type LocationDto,
-  type MenuItemDto,
-  type MenuSnapshotDto,
-} from "@/shared/contracts";
+import type { LocationDto, MenuItemDto } from "@/shared/contracts";
 import {
   evaluateMenuOrderability,
   nextMinuteBoundary,
@@ -29,100 +21,15 @@ import {
   reasonLabel,
   sourceAgeLabel,
 } from "./browse-utils";
-
-const LAST_LOCATION_KEY = "per-diem:last-location";
-
-type MenuResponse = ApiSuccessDto<MenuSnapshotDto>;
-type LocationsResponse = ApiSuccessDto<{ locations: LocationDto[] }>;
-
-class ApiClientError extends Error {
-  constructor(
-    message: string,
-    readonly retryable: boolean,
-    readonly code?: string,
-  ) {
-    super(message);
-    this.name = "ApiClientError";
-  }
-}
-
-async function getApiData<TData>(
-  path: string,
-  schema: ReturnType<typeof createApiResponseSchema>,
-): Promise<ApiSuccessDto<TData>> {
-  let response: Response;
-  try {
-    response = await fetch(path, { cache: "no-store", headers: { accept: "application/json" } });
-  } catch {
-    throw new ApiClientError("Unable to reach the menu service. Check your connection and retry.", true);
-  }
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    throw new ApiClientError("The menu service returned an invalid response.", true);
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new ApiClientError("The menu service returned an invalid response.", true);
-  }
-  if ("error" in parsed.data) {
-    throw new ApiClientError(
-      parsed.data.error.message,
-      parsed.data.error.retryable,
-      parsed.data.error.code,
-    );
-  }
-  if (!response.ok) {
-    throw new ApiClientError("The menu service could not complete this request.", true);
-  }
-  return parsed.data as ApiSuccessDto<TData>;
-}
-
-function useMenuData(locationId: string) {
-  const [menu, setMenu] = useState<MenuResponse | null>(null);
-  const [locations, setLocations] = useState<LocationsResponse | null>(null);
-  const [error, setError] = useState<ApiClientError | null>(null);
-  const [loading, setLoading] = useState(true);
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [menuResponse, locationsResponse] = await Promise.all([
-        getApiData<MenuSnapshotDto>(
-          `/api/menu?locationId=${encodeURIComponent(locationId)}`,
-          createApiResponseSchema(menuSnapshotSchema),
-        ),
-        getApiData<{ locations: LocationDto[] }>(
-          "/api/locations",
-          createApiResponseSchema(locationsDataSchema),
-        ),
-      ]);
-      setMenu(menuResponse);
-      setLocations(locationsResponse);
-      window.localStorage.setItem(LAST_LOCATION_KEY, locationId);
-    } catch (reason) {
-      setMenu(null);
-      setLocations(null);
-      setError(
-        reason instanceof ApiClientError
-          ? reason
-          : new ApiClientError("The menu could not be loaded.", true),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [locationId]);
-
-  useEffect(() => {
-    const task = window.setTimeout(() => {
-      void reload();
-    }, 0);
-    return () => window.clearTimeout(task);
-  }, [reload]);
-
-  return { error, loading, locations, menu, reload };
-}
+import {
+  ApiClientError,
+  LAST_LOCATION_KEY,
+  useLocationsBootstrap,
+  useMenuData,
+  useOnlineStatus,
+  type DataOrigin,
+  type MenuResponse,
+} from "./use-menu-data";
 
 function MenuImage({ alt, src }: { readonly alt: string; readonly src: string | null }) {
   const [failed, setFailed] = useState(false);
@@ -218,6 +125,48 @@ function AvailabilityBadge({ availability, locale }: { readonly availability: It
   );
 }
 
+function StatusBanners({
+  menu,
+  online,
+  origin,
+  refreshing,
+}: {
+  readonly menu: MenuResponse;
+  readonly online: boolean;
+  readonly origin: DataOrigin;
+  readonly refreshing: boolean;
+}) {
+  return (
+    <div className="mt-5 grid gap-3">
+      {!online ? (
+        <p className="rounded-2xl border border-slate-300 bg-slate-100 p-4 text-sm text-slate-900" role="status">
+          You are offline. Browsing and search still work from the saved menu, but cart changes stay disabled until you reconnect and refresh.
+        </p>
+      ) : null}
+      {online && origin === "browser-cache" ? (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+          Showing a saved menu snapshot{refreshing ? " while refreshing…" : "."} Inventory may be outdated, and ordering controls stay disabled until a fresh response arrives.
+        </p>
+      ) : null}
+      {menu.meta.source === "server-stale" ? (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+          This is a server-stale menu snapshot. Browsing is available, but ordering controls are disabled until it refreshes.
+        </p>
+      ) : null}
+      {menu.meta.warnings.length > 0 ? (
+        <section aria-label="Menu notices" className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+          <p className="font-semibold text-sky-950">Menu notices</p>
+          <ul className="mt-2 list-disc pl-5 text-sm text-sky-900">
+            {menu.meta.warnings.map((warning) => (
+              <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 function ItemCard({
   availability,
   item,
@@ -258,6 +207,10 @@ function DetailView({
   item,
   locale,
   locationId,
+  menu,
+  online,
+  origin,
+  refreshing,
 }: {
   readonly availability: ItemOrderability | undefined;
   readonly canMutate: boolean;
@@ -265,10 +218,15 @@ function DetailView({
   readonly item: MenuItemDto;
   readonly locale: string;
   readonly locationId: string;
+  readonly menu: MenuResponse;
+  readonly online: boolean;
+  readonly origin: DataOrigin;
+  readonly refreshing: boolean;
 }) {
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-10 sm:px-10">
       <Link className="text-sm font-semibold text-orange-800 underline" href={`/locations/${locationId}`}>Back to menu</Link>
+      <StatusBanners menu={menu} online={online} origin={origin} refreshing={refreshing} />
       <article className="mt-5 grid gap-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 md:p-8">
         <MenuImage alt={item.name} src={item.imageUrl} />
         <div>
@@ -342,34 +300,40 @@ function MenuContent({
   locationId,
   itemId,
   now,
+  online,
+  origin,
+  refreshing,
 }: {
   readonly itemId?: string;
   readonly locationId: string;
   readonly locations: readonly LocationDto[];
   readonly menu: MenuResponse;
   readonly now: Date;
+  readonly online: boolean;
+  readonly origin: DataOrigin;
+  readonly refreshing: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [pendingLocationId, setPendingLocationId] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const router = useRouter();
-  const online = typeof navigator === "undefined" ? true : navigator.onLine;
+  const isSnapshotFresh = origin === "network" && menu.meta.source !== "server-stale";
   const availability = useMemo(
     () => evaluateMenuOrderability({
       isOnline: online,
-      isSnapshotFresh: menu.meta.source !== "server-stale",
+      isSnapshotFresh,
       now,
       snapshot: menu.data,
     }).items,
-    [menu.data, menu.meta.source, now, online],
+    [isSnapshotFresh, menu.data, now, online],
   );
   const filteredItems = useMemo(
     () => filterMenuItems(menu.data, categoryId, search),
     [categoryId, menu.data, search],
   );
   const cart = useLocationCart(locationId, menu.data.location.currency, menu.data, availability);
-  const canMutate = online && menu.meta.source !== "server-stale" && cart.hydrated;
+  const canMutate = online && isSnapshotFresh && cart.hydrated;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -379,7 +343,20 @@ function MenuContent({
     const item = menu.data.items.find((candidate) => candidate.id === itemId);
     return item === undefined
       ? <NotFoundState itemId={itemId} locationId={locationId} />
-      : <DetailView availability={itemAvailability(availability, item.id)} canMutate={canMutate} cart={cart} item={item} locale={menu.data.location.locale} locationId={locationId} />;
+      : (
+        <DetailView
+          availability={itemAvailability(availability, item.id)}
+          canMutate={canMutate}
+          cart={cart}
+          item={item}
+          locale={menu.data.location.locale}
+          locationId={locationId}
+          menu={menu}
+          online={online}
+          origin={origin}
+          refreshing={refreshing}
+        />
+      );
   }
 
   function requestLocationChange(nextLocationId: string) {
@@ -427,12 +404,11 @@ function MenuContent({
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">Per Diem menu</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950" ref={headingRef} tabIndex={-1}>{menu.data.location.name}</h1>
-          <p className="mt-2 text-sm text-slate-600">{sourceAgeLabel(menu.meta, now)}</p>
+          <p className="mt-2 text-sm text-slate-600">{sourceAgeLabel(menu.meta, now, origin)}</p>
         </div>
         <div className="w-full sm:w-64"><LocationSelector activeId={locationId} locations={locations} onLocationChange={requestLocationChange} /></div>
       </header>
-      {menu.meta.source === "server-stale" ? <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">This is a server-stale menu snapshot. Browsing is available, but ordering controls are disabled until it refreshes.</p> : null}
-      {menu.meta.warnings.length > 0 ? <section className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4" aria-label="Menu notices"><p className="font-semibold text-sky-950">Menu notices</p><ul className="mt-2 list-disc pl-5 text-sm text-sky-900">{menu.meta.warnings.map((warning) => <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>)}</ul></section> : null}
+      <StatusBanners menu={menu} online={online} origin={origin} refreshing={refreshing} />
       <div className="mt-7 grid gap-4 lg:grid-cols-[15rem_1fr]">
         <aside className="lg:sticky lg:top-4 lg:self-start">
           <label className="block text-sm font-semibold text-slate-800" htmlFor="menu-search">Search menu</label>
@@ -458,13 +434,14 @@ function MenuContent({
 }
 
 export function MenuBrowser({ locationId, itemId }: { readonly itemId?: string; readonly locationId: string }) {
-  const { error, loading, locations, menu, reload } = useMenuData(locationId);
+  const { error, loading, locations, menu, origin, refreshing, reload } = useMenuData(locationId);
+  const online = useOnlineStatus();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     const refreshClock = () => setNow(new Date());
-    const schedule = () => window.setTimeout(refreshClock, Math.max(1, nextMinuteBoundary(new Date()).getTime() - Date.now()));
-    const timeout = schedule();
+    const delay = Math.max(1, nextMinuteBoundary(new Date()).getTime() - Date.now());
+    const timeout = window.setTimeout(refreshClock, delay);
     window.addEventListener("focus", refreshClock);
     window.addEventListener("online", refreshClock);
     return () => {
@@ -486,31 +463,23 @@ export function MenuBrowser({ locationId, itemId }: { readonly itemId?: string; 
   if (menu === null || locations === null || !locations.data.locations.some((location) => location.id === locationId)) {
     return <NotFoundState locationId={locationId} />;
   }
-  return <MenuContent itemId={itemId} locationId={locationId} locations={locations.data.locations} menu={menu} now={now} />;
+  return (
+    <MenuContent
+      itemId={itemId}
+      locationId={locationId}
+      locations={locations.data.locations}
+      menu={menu}
+      now={now}
+      online={online}
+      origin={origin}
+      refreshing={refreshing}
+    />
+  );
 }
 
 export function LocationRedirect() {
   const router = useRouter();
-  const [error, setError] = useState<ApiClientError | null>(null);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const response = await getApiData<{ locations: LocationDto[] }>(
-        "/api/locations",
-        createApiResponseSchema(locationsDataSchema),
-      );
-      const stored = window.localStorage.getItem(LAST_LOCATION_KEY);
-      const target = response.data.locations.find((location) => location.id === stored) ?? response.data.locations[0];
-      if (target === undefined) {
-        setError(new ApiClientError("There are no active locations to browse.", false));
-        return;
-      }
-      router.replace(`/locations/${target.id}`);
-    } catch (reason) {
-      setError(reason instanceof ApiClientError ? reason : new ApiClientError("The locations could not be loaded.", true));
-    }
-  }, [router]);
+  const { error, load, loading, locations } = useLocationsBootstrap();
 
   useEffect(() => {
     const task = window.setTimeout(() => {
@@ -519,5 +488,23 @@ export function LocationRedirect() {
     return () => window.clearTimeout(task);
   }, [load]);
 
-  return error === null ? <LoadingState /> : <ErrorState error={error} onRetry={() => void load()} />;
+  useEffect(() => {
+    if (locations === null) {
+      return;
+    }
+    const stored = window.localStorage.getItem(LAST_LOCATION_KEY);
+    const target = locations.data.locations.find((location) => location.id === stored) ?? locations.data.locations[0];
+    if (target === undefined) {
+      return;
+    }
+    router.replace(`/locations/${target.id}`);
+  }, [locations, router]);
+
+  if (error !== null && locations === null) {
+    return <ErrorState error={error} onRetry={() => void load()} />;
+  }
+  if (!loading && locations !== null && locations.data.locations.length === 0) {
+    return <ErrorState error={new ApiClientError("There are no active locations to browse.", false)} onRetry={() => void load()} />;
+  }
+  return <LoadingState />;
 }

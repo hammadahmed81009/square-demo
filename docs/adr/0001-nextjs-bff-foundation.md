@@ -2,7 +2,6 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-23
-- **Work package:** PD-00
 
 ## Context
 

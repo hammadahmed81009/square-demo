@@ -145,12 +145,17 @@ export function reasonLabel(
   return "This item’s modifier setup needs attention.";
 }
 
-export function sourceAgeLabel(meta: ApiMetaDto, now: Date): string {
+export function sourceAgeLabel(
+  meta: ApiMetaDto,
+  now: Date,
+  origin: "network" | "browser-cache" = "network",
+): string {
   const ageMinutes = Math.max(0, Math.floor((now.getTime() - Date.parse(meta.fetchedAt)) / 60_000));
+  const cached = origin === "browser-cache" || meta.source !== "upstream";
   if (ageMinutes < 1) {
-    return meta.source === "upstream" ? "Updated just now" : "Cached just now";
+    return cached ? "Cached just now" : "Updated just now";
   }
-  return `${meta.source === "upstream" ? "Updated" : "Cached"} ${ageMinutes}m ago`;
+  return `${cached ? "Cached" : "Updated"} ${ageMinutes}m ago`;
 }
 
 export function itemAvailability(

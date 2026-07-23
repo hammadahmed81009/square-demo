@@ -2,13 +2,11 @@
 
 A Next.js application for browsing a Square Sandbox catalog across multiple locations while respecting location presence, business hours, category schedules, modifiers, and inventory state.
 
-The repository is being delivered through the work packages in [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md). PD-00 establishes the runnable, testable, security-conscious foundation; later packages implement the Square integration and product features.
-
 ## Prerequisites
 
 - Node.js `22.23.1` (see `.nvmrc` and `.node-version`)
 - pnpm `10.14.0` through Corepack
-- A Square Sandbox application for later integration work
+- A Square Sandbox application with a server-side access token
 
 ## Local setup
 
@@ -20,7 +18,7 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-Open <http://localhost:3000>. Replace the placeholder in `.env.local` with a Square Sandbox access token before implementing or exercising Square-backed endpoints.
+Open <http://localhost:3000>. Replace the placeholder in `.env.local` with a Square Sandbox access token before exercising Square-backed endpoints.
 
 The Square environment, API origin, and API version are fixed server-side. Do not add the token, environment, or upstream URL to a `NEXT_PUBLIC_*` variable.
 
@@ -54,11 +52,11 @@ pnpm exec playwright install chromium
 - `src/shared` owns serializable schemas and browser-safe utilities.
 - `src/server` is the only boundary permitted to read secrets or use the Square SDK.
 
-The accepted foundation decision is documented in [ADR 0001](./docs/adr/0001-nextjs-bff-foundation.md).
+Validated menu and location snapshots are cached in IndexedDB for offline browsing. Cart mutations stay disabled until a fresh online response succeeds. The accepted foundation decision is documented in [ADR 0001](./docs/adr/0001-nextjs-bff-foundation.md).
 
 ## Square Sandbox data
 
-The final seed-data guide will cover two active locations, 3–4 categories, 6–10 items, a location-specific item, scheduled availability, modifiers, location price overrides, tracked inventory, and a sold-out variation. This is delivered under PD-10 after the gateway and normalization contracts exist.
+Seed data should include two active locations, 3–4 categories, 6–10 items, a location-specific item, scheduled availability, modifiers, location price overrides, tracked inventory, and a sold-out variation.
 
 ## Testing strategy
 
@@ -67,12 +65,6 @@ The final seed-data guide will cover two active locations, 3–4 categories, 6�
 - Playwright covers guest-critical flows in a real browser.
 - CI also performs production dependency auditing and secret scanning.
 
-## Current status
-
-- PD-00: complete and verified
-- PD-01: complete and verified
-- PD-02–PD-10: tracked in the implementation plan
-
-## Another-week roadmap
+## Roadmap
 
 After the challenge scope, add production OAuth, Square Channels mapping, webhook-driven cache invalidation, distributed caching, observability export, and server-side checkout revalidation. Payments and Square Order creation remain deliberately outside this challenge.

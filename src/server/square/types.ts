@@ -25,9 +25,10 @@ export interface SquareInventoryPageRequest {
 }
 
 /**
- * Square responses are intentionally opaque here. PD-03 owns their runtime
- * validation and normalization; keeping `unknown` prevents a raw SDK shape or
- * bigint value from accidentally crossing into a public API contract.
+ * Square responses are intentionally opaque here. Runtime validation and
+ * normalization own the conversion to public DTOs; keeping `unknown` prevents
+ * a raw SDK shape or bigint value from accidentally crossing into a public API
+ * contract.
  */
 export interface SquareLocationsPage {
   readonly locations: readonly unknown[];

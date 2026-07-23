@@ -90,7 +90,7 @@ function uniqueSortedIds(ids: readonly string[]): readonly string[] {
 
 /**
  * Server-side Square read gateway. It returns only raw, opaque upstream values
- * to PD-03, where all public normalization and Zod validation happens.
+ * for later public normalization and Zod validation.
  */
 export class SquareGateway {
   private readonly cache: InMemoryTtlCache<PagedResult>;
