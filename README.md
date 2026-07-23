@@ -2,6 +2,20 @@
 
 A Next.js application for browsing a Square Sandbox catalog across multiple locations while respecting location presence, business hours, category schedules, modifiers, and inventory state.
 
+## Documentation
+
+| Doc | Contents |
+| --- | --- |
+| [docs/square-setup.md](./docs/square-setup.md) | Square account, Sandbox app, token, permissions, env, startup |
+| [docs/seed-data.md](./docs/seed-data.md) | Deterministic Sandbox seed-data matrix |
+| [docs/product-behavior.md](./docs/product-behavior.md) | Availability, presence, inventory, offline, cart, Channels limitation |
+| [docs/architecture.md](./docs/architecture.md) | Architecture, security, tests, trade-offs, roadmap |
+| [docs/verification-evidence.md](./docs/verification-evidence.md) | Local CI command evidence |
+| [docs/loom-script.md](./docs/loom-script.md) | 60–90s Loom shot list |
+| [docs/submission-email.md](./docs/submission-email.md) | Submission email draft |
+| [docs/commit-history.md](./docs/commit-history.md) | Commit history review notes |
+| [docs/adr/0001-nextjs-bff-foundation.md](./docs/adr/0001-nextjs-bff-foundation.md) | Foundation ADR |
+
 ## Prerequisites
 
 - Node.js `22.23.1` (see `.nvmrc` and `.node-version`)
@@ -18,7 +32,7 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-Open <http://localhost:3000>. Replace the placeholder in `.env.local` with a Square Sandbox access token before exercising Square-backed endpoints.
+Open <http://localhost:3000>. Put the Sandbox access token in `.env.local` (see [docs/square-setup.md](./docs/square-setup.md)). Seed the merchant using [docs/seed-data.md](./docs/seed-data.md).
 
 The Square environment, API origin, and API version are fixed server-side. Do not add the token, environment, or upstream URL to a `NEXT_PUBLIC_*` variable.
 
@@ -44,7 +58,7 @@ Install the Playwright browser once before the first local E2E run:
 pnpm exec playwright install chromium
 ```
 
-## Architecture
+## Architecture (summary)
 
 - `src/app` owns routes, layouts, and route handlers.
 - `src/features` owns user-facing menu and cart behavior.
@@ -52,11 +66,7 @@ pnpm exec playwright install chromium
 - `src/shared` owns serializable schemas and browser-safe utilities.
 - `src/server` is the only boundary permitted to read secrets or use the Square SDK.
 
-Validated menu and location snapshots are cached in IndexedDB for offline browsing. Cart mutations stay disabled until a fresh online response succeeds. The accepted foundation decision is documented in [ADR 0001](./docs/adr/0001-nextjs-bff-foundation.md).
-
-## Square Sandbox data
-
-Seed data should include two active locations, 3–4 categories, 6–10 items, a location-specific item, scheduled availability, modifiers, location price overrides, tracked inventory, and a sold-out variation.
+Validated menu and location snapshots are cached in IndexedDB for offline browsing. Cart mutations stay disabled until a fresh online response succeeds. Details: [docs/architecture.md](./docs/architecture.md).
 
 ## Testing strategy
 
@@ -65,7 +75,7 @@ Seed data should include two active locations, 3–4 categories, 6–10 items, a
 - Playwright covers guest-critical flows in a real browser, including accessibility smoke checks.
 - CI also performs production dependency auditing and secret scanning.
 
-Acceptance evidence for the local verification suite is recorded in [docs/verification-evidence.md](./docs/verification-evidence.md).
+Acceptance evidence: [docs/verification-evidence.md](./docs/verification-evidence.md).
 
 ## Roadmap
 
